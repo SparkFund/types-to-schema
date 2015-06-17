@@ -13,6 +13,6 @@ For all namespaces in the vector, types to schema will then assert that these fu
 
 ## License
 
-Copyright © 2015
+Copyright © 2015 
 
-Distributed under the Eclipse Public License version 1.0.
+Distributed under the Apache License, Version 2.0.
