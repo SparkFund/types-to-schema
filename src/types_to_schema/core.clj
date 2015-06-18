@@ -1,4 +1,4 @@
-(ns spark.util.types-to-schema
+(ns types-to-schema.core
   "Converts Typed Clojure types to Prismatic Schemas for runtime checking"
   {:core.typed {:collect-only true}}
   (:require [clojure.core.typed.ast-ops :as ops]

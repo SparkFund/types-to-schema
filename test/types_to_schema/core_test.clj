@@ -1,7 +1,6 @@
 (ns types-to-schema.core-test
   (:require [clojure.test :refer :all]
-            [types-to-schema.core :refer :all]))
-
-(deftest a-test
-  (testing "FIXME, I fail."
-    (is (= 0 1))))
+            [clojure.core.typed :as t]
+            [types-to-schema.core :refer :all]
+            [types-to-schema.test-functions :refer :all]
+            [types-to-schema.unwrapped-functions :refer :all]))
