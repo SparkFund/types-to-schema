@@ -1,7 +1,8 @@
 (ns types-to-schema.core
   "Converts Typed Clojure types to Prismatic Schemas for runtime checking"
   {:core.typed {:collect-only true}}
-  (:require [clojure.core.typed.ast-ops :as ops]
+  (:require [clojure.tools.reader :as r]
+            [clojure.core.typed.ast-ops :as ops]
             [clojure.core.typed.current-impl :as impl]
             [clojure.core.typed.errors :as err]
             [clojure.core.typed.parse-ast :as ast]
@@ -251,7 +252,7 @@
   eg. (s/validate (schema Number) 1)
       ;=> 1"
   [t]
-  `(type-syntax->schema (quote ~t) (atom {})))
+  `(type-syntax->schema (r/syntax-quote ~t) (atom {})))
 
 (defn wrap-namespaces!
   "tries to wrap every fn in the namespaces with an annotation. Ignores fns that
