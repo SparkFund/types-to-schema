@@ -11,8 +11,19 @@ The main use case of this type to schema checker is in test files. You can asser
 ```
 For all namespaces in the vector, types to schema will then assert that these functions are receiving correctly typed input and giving correctly typed output.
 
+Another use would be to create a Prismatic Schema for a core type like so:
+```
+(schema Number)
+;=> java.lang.Number
+```
+You can then do validation on clojure values and variables like so:
+```
+(require '[schema.core :as s])
+(s/validate (schema Number) 1)
+;=> 1
+```
 ## License
 
-Copyright © 2015
+Copyright © 2015 
 
-Distributed under the Eclipse Public License version 1.0.
+Distributed under the Apache License, Version 2.0.

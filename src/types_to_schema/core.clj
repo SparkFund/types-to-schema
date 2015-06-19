@@ -1,17 +1,11 @@
 (ns types-to-schema.core
   "Converts Typed Clojure types to Prismatic Schemas for runtime checking"
   {:core.typed {:collect-only true}}
-  (:require [clojure.set :as set]
-            [clojure.core.typed :as t]
-            [clojure.core.typed.hole]
-            [clojure.core.typed.parse-ast :as ast]
-            [clojure.core.typed.errors :as err]
-            [clojure.core.typed.ast-ops :as ops]
+  (:require [clojure.core.typed.ast-ops :as ops]
             [clojure.core.typed.current-impl :as impl]
-            [clojure.core.typed.util-vars :as vs]
+            [clojure.core.typed.errors :as err]
+            [clojure.core.typed.parse-ast :as ast]
             [schema.core :as s]))
-
-(def ^:dynamic *inside-rec* #{})
 
 ;;; This is probably more of general utility?
 (defrecord SchemaMap [f schema desc]
@@ -139,9 +133,6 @@
                   (reset! myself (ast->schema (ops/resolve-Name t) name-env))
                   (s/named (s/recursive myself) (:name t))))
      :cljs (err/int-error (str "TODO CLJS Name")))
-                                        ; (cond
-                                        ;  (empty? (:poly? t)) `(instance? ~(:the-class t) ~arg)
-                                        ;  :else (err/int-error (str "Cannot generate predicate for polymorphic Class")))
     (:Any) s/Any
     (:U) (apply s/either (mapv #(ast->schema % name-env) (:types t))) ;; TODO Could we generate a nice name from the type? Prismatic schema's Either isn't so informative
     (:I) (apply s/both (mapv #(ast->schema % name-env) (:types t)))
@@ -221,8 +212,6 @@
       {:dom-schemas dom-schemas
        :rng-schema rng-schema})))
 
-;;; Can we take just the var? Is there any way to go from var->symbol?
-;;; TODO can we save the real unwrapped one in metadata so we don't re-wrap forever?
 (defn wrap-fn-sym!
   "wraps validation to a ns-qualified fn, if it has a type annotation"
   [fn-sym name-env]
@@ -299,7 +288,12 @@
     (doseq [qs qual-syms]
       (unwrap-fn-sym! qs))))
 
-(defn wrap-namespaces-fixture [ns-syms]
+;;; TODO Think about if we /want/ to leave some functions wrap-fn-sym!'d in
+;;; production, and NOT unwrapped by the test fixture.
+(defn wrap-namespaces-fixture
+  "Wraps all functions it can in namespaces named by ns-syms and unwraps all of them.
+  CAUTION: Will unwrap functions you've manually picked to be wrapped via wrap-fn-sym!"
+  [ns-syms]
   (fn [f]
     (wrap-namespaces! (map find-ns ns-syms))
     (f)
@@ -311,16 +305,3 @@
   (require '[schema.core :as s])
   (require '[spark.util.types-to-schema :as tts])
   (require '[clojure.core.typed.current-impl :as impl]))
-#_
-(do
-  (tts/wrap-namespaces! [(find-ns 'spark.types)])
-  (require '[spark.types :as st])
-  ;; Keep error messages not so huge
-  (type-syntax->schema `(t/Option String) (atom nil))
-  (try (s/validate (type-syntax->schema 'Long (atom nil)) "ok")
-       (catch clojure.lang.ExceptionInfo e (select-keys (ex-data e) [:value :error])))
-  (tts/ast->schema @(get @impl/var-env 'spark.types/transaction) (atom nil))
-  (let [var-env (atom nil)]
-    (impl/with-impl impl/clojure
-      (mapv #(ast->schema % var-env)
-            (:dom (first (:arities @(get @impl/var-env `spark.logic.funding/remaining-principal-at-month-exact))))))))
