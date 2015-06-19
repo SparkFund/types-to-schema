@@ -26,8 +26,8 @@ If you are using Maven:
 
 The main use case of this type to schema checker is in test files. You can assert that all test functions are using the types specified by core.typed like so:
 ```
-(require '[spark.util.types-to-schema :as tts])
-(use-fixtures :once (tts/wrap-namespaces-fixture '[spark.logic.funding]))
+(require '[types-to-schema.core :as tts])
+(use-fixtures :once (tts/wrap-namespaces-fixture '[test.wrapping-namespace]))
 ```
 For all namespaces in the vector, types to schema will then assert that these functions are receiving correctly typed input and giving correctly typed output.
 
