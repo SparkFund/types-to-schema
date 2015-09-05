@@ -29,6 +29,18 @@
     (is (thrown? clojure.lang.ExceptionInfo (broken-output 1 6)))
     (is (= (inc counter) @function-calls))))
 
+(deftest test-arity
+  (is (= (good-fn1 1)   1))
+  (is (= (good-fn2 1 2) 2))
+  (is (thrown? clojure.lang.ExceptionInfo (good-fn1 1 2)))
+  (is (thrown? clojure.lang.ExceptionInfo (good-fn2 1)))
+  (is (thrown? clojure.lang.ExceptionInfo (good-fn2 1 2 3)))
+  (is (thrown? clojure.lang.ExceptionInfo (rest-arg))))
+
+(deftest test-rest-args
+  (is (= 6 (rest-arg 0 1 2 3)) "wrapped rest args give expected output")
+  (is (thrown? clojure.lang.ExceptionInfo (rest-arg 0 1 "2")) "wrapped rest args check schema"))
+
 (deftest wrap-and-unwrap
   (let [_ (wrap-namespaces! '[types-to-schema.unwrapped-functions])]
     (is (thrown? clojure.lang.ExceptionInfo (ignores-arguments 5 6))

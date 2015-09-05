@@ -28,3 +28,18 @@
   (swap! function-calls inc)
   "Please break")
 
+(t/ann ^:no-check good-fn1 [Long -> Long])
+(defn good-fn1
+  [a]
+  a)
+
+(t/ann ^:no-check good-fn2 [Long Long -> Long])
+(defn good-fn2
+  [a b]
+  b)
+
+(t/ann ^:no-check rest-arg [Long Long * -> Number])
+(defn rest-arg [a & rest]
+  (let [a (+ 2 3)]
+    a)
+  (reduce + a rest))

@@ -170,8 +170,18 @@
 
 (defn wrap-with-validation
   "Only works for single-method fns at the moment."
-  [f fn-sym dom-schemas rng-schema]
+  [f fn-sym {:keys [dom-schemas rest-schema rng-schema]}]
   (fn [& args]
+    (when-not (if (some? rest-schema)
+                (<= (count dom-schemas) (count args))
+                (= (count dom-schemas) (count args)))
+      (throw (ex-info (str "Supplied " (count args) " argument" (when (< 1 (count args)) "s")
+                           " when " fn-sym " expected "
+                           (if (some? rest-schema)
+                             (str "at least " (count dom-schemas))
+                             (count dom-schemas))
+                           " argument" (when (< 1 (count dom-schemas)) "s"))
+                      {:fn-sym fn-sym})))
     (let [r (apply f (map-indexed
                       (fn [idx [s arg]]
                         (try (s/validate s arg)
@@ -181,7 +191,7 @@
                                                 :value arg
                                                 :fn-sym fn-sym
                                                 :which-schema [:argument idx]})))))
-                      (map vector dom-schemas args)))]
+                      (map vector (concat dom-schemas (repeat rest-schema)) args)))]
       (try (s/validate rng-schema r)
            (catch java.lang.IllegalArgumentException e
              (throw (ex-info (str "Bad return schema for" fn-sym)
@@ -206,11 +216,17 @@
                              (mapv #(ast->schema % name-env))
                              (map-indexed (fn [i s] (s/named s [fn-sym :domain i])))
                              (doall)))
+          rest-schema (when (:rest meth)
+                        (impl/with-impl impl/clojure
+                          (-> (:rest meth)
+                              (ast->schema name-env)
+                              (s/named [fn-sym :rest]))))
           rng-schema  (impl/with-impl impl/clojure
                         (-> (:rng meth)
                             (ast->schema name-env)
                             (s/named [fn-sym :range])))]
       {:dom-schemas dom-schemas
+       :rest-schema rest-schema
        :rng-schema rng-schema})))
 
 (defn wrap-fn-sym!
@@ -220,10 +236,10 @@
     (let [vr (resolve fn-sym)
           prev (::before-validation-added (meta vr))]
       (do (if (some? prev)
-            (alter-var-root vr (fn [_] (wrap-with-validation prev fn-sym (:dom-schemas s) (:rng-schema s))))
+            (alter-var-root vr (fn [_] (wrap-with-validation prev fn-sym s)))
             (do
               (alter-meta! vr assoc ::before-validation-added (deref vr))
-              (alter-var-root vr wrap-with-validation fn-sym (:dom-schemas s) (:rng-schema s))))
+              (alter-var-root vr wrap-with-validation fn-sym s)))
           :added))
     :not-added))
 
@@ -304,5 +320,5 @@
 (do
   (require '[clojure.core.typed :as t])
   (require '[schema.core :as s])
-  (require '[spark.util.types-to-schema :as tts])
+  (require '[types-to-schema.core :as tts])
   (require '[clojure.core.typed.current-impl :as impl]))
