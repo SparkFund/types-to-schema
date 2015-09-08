@@ -41,6 +41,14 @@
   (is (= 6 (rest-arg 0 1 2 3)) "wrapped rest args give expected output")
   (is (thrown? clojure.lang.ExceptionInfo (rest-arg 0 1 "2")) "wrapped rest args check schema"))
 
+(deftest test-multi-arity
+  (is (= 1 (multi-arity 0)))
+  (is (= 2 (multi-arity 0 0)))
+  (is (= 3 (multi-arity 1 2 3)))
+  (is (thrown? clojure.lang.ExceptionInfo (multi-arity 1 "string")))
+  (is (thrown? clojure.lang.ExceptionInfo (multi-arity 1 2 "string")))
+  (is (thrown? clojure.lang.ExceptionInfo (multi-arity))))
+
 (deftest wrap-and-unwrap
   (let [_ (wrap-namespaces! '[types-to-schema.unwrapped-functions])]
     (is (thrown? clojure.lang.ExceptionInfo (ignores-arguments 5 6))

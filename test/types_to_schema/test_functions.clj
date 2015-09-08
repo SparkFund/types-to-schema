@@ -43,3 +43,13 @@
   (let [a (+ 2 3)]
     a)
   (reduce + a rest))
+
+(t/ann ^:no-check multi-arity
+       (t/Fn [Long -> Long]
+             [Long Long Long * -> Long] ;; putting these out of natural order to be difficult on ourselves.
+             [Long Long -> Long]
+             ))
+(defn multi-arity
+  ([a] 1)
+  ([a b] 2)
+  ([a b & rest] (last rest)))

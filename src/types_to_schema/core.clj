@@ -168,8 +168,8 @@
     (:Rec) (throw (ex-info  "Cannot generate predicate for recursive types" {:type ::ast->schema}))
     (throw (ex-info (str op " not supported in type->pred: " (:form t)) {:type ::ast->schema}))))
 
-(defn wrap-with-validation
-  "Only works for single-method fns at the moment."
+(defn wrap-single-arity-fn-with-validation
+  "Wraps a single-method fn with arity checking."
   [f fn-sym {:keys [dom-schemas rest-schema rng-schema]}]
   (fn [& args]
     (when-not (if (some? rest-schema)
@@ -200,48 +200,100 @@
                               :fn-sym fn-sym
                               :which-schema :return-schema})))))))
 
+(defn wrap-multi-arity-fn-with-validation
+  [f fn-sym method-schemas]
+  (let [[vararg fixed] ((juxt filter remove) #(some? (:rest-schema %)) method-schemas)
+        [vararg-fixed-count vararg-wrapped]
+        ,(do (when (< 1 (count vararg))
+               (throw (ex-info "multiple varargs schemas defined"
+                               {:fn-sym fn-sym
+                                :method-schemas method-schemas})))
+             [(count (:dom-schemas (first vararg)))
+              (wrap-single-arity-fn-with-validation f fn-sym
+                                                    (first vararg))])
+        ;; {0 wrapped-method, 1 wrapped-method, ...}
+        fixed-arity->wrapped (apply merge-with
+                                    (fn [l r] (throw (ex-info "duplicated fixed arity:" {:l l :r r})))
+                                    {}
+                                    (for [s fixed]
+                                      {(count (:dom-schemas s))
+                                       (wrap-single-arity-fn-with-validation f fn-sym s)}))]
+    (when (and vararg-wrapped
+               (< vararg-fixed-count (apply max (keys fixed-arity->wrapped))))
+      (throw (ex-info "Can't have fixed arity function with more params than variadic function"
+                      {:fn-sym fn-sym
+                       :vararg-wrapped vararg-wrapped
+                       :fixed-arity->wrapped fixed-arity->wrapped
+                       :method-schemas method-schemas})))
+    (fn [& args]
+      (if-let [fixed (get fixed-arity->wrapped (count args))]
+        (apply fixed args)
+        (if vararg-wrapped
+          (apply vararg-wrapped args)
+          (throw (ex-info "No matching arity"
+                          {:arity (count args)
+                           :fn-sym fn-sym
+                           :method-schemas method-schemas})))))))
+
 (defn fn-schemas
   "ns-qualified fn-sym. Looks up the fns type in the typed clojure impl/var-env
   returns nil if fn-sym doesn't have type annotation.
 
   only works for single-method fns for now."
-  [fn-sym name-env]
-  (when-let [parse (get @impl/var-env fn-sym)]
-    (let [meths (:arities @parse)
-          _ (when (not= 1 (count meths)) (throw (ex-info "only single arity validation for now"
-                                                         {:type ::ast->schema})))
-          meth (first meths)
-          dom-schemas (impl/with-impl impl/clojure
-                        (->> (:dom meth)
-                             (mapv #(ast->schema % name-env))
-                             (map-indexed (fn [i s] (s/named s [fn-sym :domain i])))
-                             (doall)))
-          rest-schema (when (:rest meth)
-                        (impl/with-impl impl/clojure
-                          (-> (:rest meth)
-                              (ast->schema name-env)
-                              (s/named [fn-sym :rest]))))
-          rng-schema  (impl/with-impl impl/clojure
-                        (-> (:rng meth)
+  [fn-sym parse name-env]
+  (let [meths (:arities parse)
+        _ (def meths meths)
+        ;; At least for toplevel annotations, it seems Typed Clojure
+        ;; represents multiple arities always as a TApp of :Fn with :rands of
+        ;; the various actual :Fn types for each arity. So each :arities only
+        ;; ever seems to contain a single item.
+        _ (when (not= 1 (count meths))
+            (throw (ex-info "types-to-schema only expects a single arity per :Fn at this point."
+                            {:type ::ast->schema})))
+        meth (first meths)
+        dom-schemas (impl/with-impl impl/clojure
+                      (->> (:dom meth)
+                           (mapv #(ast->schema % name-env))
+                           (map-indexed (fn [i s] (s/named s [fn-sym :domain i])))
+                           (doall)))
+        rest-schema (when (:rest meth)
+                      (impl/with-impl impl/clojure
+                        (-> (:rest meth)
                             (ast->schema name-env)
-                            (s/named [fn-sym :range])))]
-      {:dom-schemas dom-schemas
-       :rest-schema rest-schema
-       :rng-schema rng-schema})))
+                            (s/named [fn-sym :rest]))))
+        rng-schema  (impl/with-impl impl/clojure
+                      (-> (:rng meth)
+                          (ast->schema name-env)
+                          (s/named [fn-sym :range])))]
+    {:dom-schemas dom-schemas
+     :rest-schema rest-schema
+     :rng-schema rng-schema}))
 
 (defn wrap-fn-sym!
   "wraps validation to a ns-qualified fn, if it has a type annotation"
   [fn-sym name-env]
-  (if-let [s (fn-schemas fn-sym name-env)]
-    (let [vr (resolve fn-sym)
-          prev (::before-validation-added (meta vr))]
-      (do (if (some? prev)
-            (alter-var-root vr (fn [_] (wrap-with-validation prev fn-sym s)))
-            (do
-              (alter-meta! vr assoc ::before-validation-added (deref vr))
-              (alter-var-root vr wrap-with-validation fn-sym s)))
-          :added))
-    :not-added))
+  (let [parse (when-let [p (get @impl/var-env fn-sym)] @p)
+        wrap-fn (cond
+                  (= :Fn (:op parse))
+                  ,(fn [f] (wrap-single-arity-fn-with-validation f
+                                                                 fn-sym
+                                                                 (fn-schemas fn-sym parse name-env)))
+                  (and (= :TApp (:op parse)) (every? #(= :Fn (:op %)) (:rands parse)))
+                  ,(fn [f] (wrap-multi-arity-fn-with-validation f
+                                                                fn-sym
+                                                                (map #(fn-schemas fn-sym % name-env)
+                                                                     (:rands parse))))
+                  :else nil)]
+    (if wrap-fn
+      (let [vr (resolve fn-sym)
+            prev (::before-validation-added (meta vr))]
+        (do (if (some? prev)
+              (alter-var-root vr (fn [_] (wrap-fn prev)))
+              (do
+                (alter-meta! vr assoc ::before-validation-added (deref vr))
+                (alter-var-root vr wrap-fn)))
+            :added))
+      :not-added)))
 
 (defn unwrap-fn-sym!
   "unwraps validation from a ns-qualified fn.
@@ -290,7 +342,8 @@
                      (when (not= ::ast->schema (:type (ex-data e)))
                        (throw (ex-info (str "Error wrapping " qs)
                                        (assoc (ex-data e)
-                                              :qual-sym qs))))
+                                              :qual-sym qs
+                                              :original-message (.getMessage e)))))
                      :not-added))
               [qs]}))))
 
