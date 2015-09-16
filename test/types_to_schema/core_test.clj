@@ -45,6 +45,8 @@
   (is (= 1 (multi-arity 0)))
   (is (= 2 (multi-arity 0 0)))
   (is (= 3 (multi-arity 1 2 3)))
+  (is (= 0 (multi-arity2)) "Works without a rest vararg too")
+  (is (= 2 (multi-arity2 1 2)) "Works without a rest vararg too")
   (is (thrown? clojure.lang.ExceptionInfo (multi-arity 1 "string")))
   (is (thrown? clojure.lang.ExceptionInfo (multi-arity 1 2 "string")))
   (is (thrown? clojure.lang.ExceptionInfo (multi-arity))))

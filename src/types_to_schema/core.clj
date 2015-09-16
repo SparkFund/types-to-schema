@@ -208,9 +208,10 @@
                (throw (ex-info "multiple varargs schemas defined"
                                {:fn-sym fn-sym
                                 :method-schemas method-schemas})))
-             [(count (:dom-schemas (first vararg)))
-              (wrap-single-arity-fn-with-validation f fn-sym
-                                                    (first vararg))])
+             (when (= 1 (count vararg))
+               [(count (:dom-schemas (first vararg)))
+                (wrap-single-arity-fn-with-validation f fn-sym
+                                                      (first vararg))]))
         ;; {0 wrapped-method, 1 wrapped-method, ...}
         fixed-arity->wrapped (apply merge-with
                                     (fn [l r] (throw (ex-info "duplicated fixed arity:" {:l l :r r})))

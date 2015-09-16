@@ -53,3 +53,10 @@
   ([a] 1)
   ([a b] 2)
   ([a b & rest] (last rest)))
+
+(t/ann ^:no-check multi-arity2
+       (t/Fn [-> Long]
+             [Long Long -> Long]))
+(defn multi-arity2
+  ([] 0)
+  ([a b] b))
