@@ -9,6 +9,27 @@
             [clojure.core.typed.parse-ast :as ast]
             [schema.core :as s]))
 
+(def annotations-defined
+  "For coverage checking. All annotations created by types-to-schema.core/ann."
+  (atom #{}))
+(def wrappers-created
+  "For coverage checking. A set of every wrapper that's been created, by function symbol."
+  (atom #{}))
+(def wrappers-called
+  "For coverage checking. A set of every wrapper that's been called, by function symbol."
+  (atom #{}))
+
+(defmacro ann
+  "Same as core.typed ann, but logs the annotation in the global
+  `annotations-defined` for use in coverage checking."
+  [varsym typesym]
+  (do (let [var (resolve varsym) ; have to resolve because you can annotate symbols in different namespaces. *ns* isn't necessarily accurate.
+            _ (when (nil? var) (throw (ex-info (str "Can't annotate because " varsym " can't be resolved.")
+                                               {:varsym varsym :ann typesym})))
+            qual-sym (symbol (str (.name (.ns var))) (str (.sym var)))]
+        (swap! annotations-defined conj qual-sym))
+      `(t/ann ~varsym ~typesym)))
+
 ;;; This is probably more of general utility?
 (defrecord SchemaMap [f schema desc]
   s/Schema
@@ -68,7 +89,10 @@
      clojure.lang.PersistentHashMap)
     {:args #{2}
      :pred  (fn [a? b?]
-              {a? b?})}))
+              {a? b?})}
+    (clojure.lang.Atom)
+    (throw (ex-info "types-to-schema can't wrap Atom types"
+                    {:type ::ast->schema}))))
 
 (declare ast->schema)
 
@@ -172,7 +196,9 @@
 (defn wrap-single-arity-fn-with-validation
   "Wraps a single-method fn with arity checking."
   [f fn-sym {:keys [dom-schemas rest-schema rng-schema]}]
+  (swap! wrappers-created conj fn-sym)
   (fn [& args]
+    (swap! wrappers-called conj fn-sym)
     (when-not (if (some? rest-schema)
                 (<= (count dom-schemas) (count args))
                 (= (count dom-schemas) (count args)))
