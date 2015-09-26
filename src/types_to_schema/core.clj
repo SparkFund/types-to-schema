@@ -2,6 +2,7 @@
   "Converts Typed Clojure types to Prismatic Schemas for runtime checking"
   {:core.typed {:collect-only true}}
   (:require [clojure.tools.reader :as r]
+            [clojure.core.typed :as t]
             [clojure.core.typed.ast-ops :as ops]
             [clojure.core.typed.current-impl :as impl]
             [clojure.core.typed.errors :as err]
