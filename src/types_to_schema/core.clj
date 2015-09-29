@@ -307,7 +307,17 @@
                 (alter-meta! vr assoc ::before-validation-added (deref vr))
                 (alter-var-root vr wrap-fn)))
             :added))
-      :not-added)))
+      ;; o/w it's not a function and we should try to schema-validate the value itself - nothing needs to be wrapped.
+      (do (swap! wrappers-created conj fn-sym)
+          (swap! wrappers-called conj fn-sym)
+          (let [schema (impl/with-impl impl/clojure (ast->schema parse name-env))]
+            (try (s/validate schema @(resolve fn-sym))
+                 (catch java.lang.IllegalArgumentException e
+                   (throw (ex-info (str "Bad schema for" fn-sym)
+                                   {:schema schema
+                                    :value @(resolve fn-sym)
+                                    :fn-sym fn-sym})))))
+          :not-added))))
 
 (defn unwrap-fn-sym!
   "unwraps validation from a ns-qualified fn.
