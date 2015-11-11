@@ -286,7 +286,7 @@
 (defn wrap-fn-sym!
   "wraps validation to a ns-qualified fn, if it has a type annotation"
   [fn-sym name-env]
-  (let [parse (when-let [p (get @impl/var-env fn-sym)] @p)
+  (let [parse (when-let [p (get (impl/with-impl impl/clojure (impl/var-env)) fn-sym)] @p)
         wrap-fn (cond
                   (= :Fn (:op parse))
                   ,(fn [f] (wrap-single-arity-fn-with-validation f
