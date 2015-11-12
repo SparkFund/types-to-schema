@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.core.typed :as t]
             [schema.core :as s]
-            [types-to-schema.core :refer :all]
+            [types-to-schema.core :refer :all :as tts]
             [types-to-schema.test-functions :refer :all]
             [types-to-schema.unwrapped-functions :refer :all]))
 
