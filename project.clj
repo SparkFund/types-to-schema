@@ -1,4 +1,4 @@
-(defproject types-to-schema "0.1.3"
+(defproject types-to-schema "0.1.4"
   :description "Converts Typed Clojure types to Prismatic Schemas for runtime checking"
   :url "https://github.com/SparkFund/types-to-schema"
   :license {:name "Apache License, Version 2.0"
