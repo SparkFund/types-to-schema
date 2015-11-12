@@ -7,4 +7,4 @@
                  [org.clojure/tools.reader "0.9.2"]
                  [org.clojure/core.typed "0.3.14"
                   :exclusions [org.clojure/tools.reader]]
-                 [prismatic/schema "0.2.4"]])
+                 [prismatic/schema "1.0.3"]])

@@ -17,6 +17,7 @@
   (atom #{}))
 
 ;;; This is probably more of general utility?
+#_
 (defrecord SchemaMap [f schema desc]
   s/Schema
   (walker [this]
@@ -24,7 +25,7 @@
       (clojure.core/fn [x]
         (sub-walker (f x)))))
   (explain [this] (list 'schema-map desc (s/explain schema))))
-
+#_
 (defn schema-map
   "fmap for schemas (applies f to values before schema checking)"
   [f schema desc]
@@ -35,7 +36,8 @@
     (clojure.lang.Seqable)
     {:args #{1}
      :pred (fn [a?]
-             (schema-map seq [a?] `seq))}
+             (throw (ex-info "TODO" {:v a?}))
+             #_(schema-map seq [a?] `seq))}
     (clojure.lang.IPersistentCollection
      clojure.lang.ISeq
      clojure.lang.IPersistentStack
@@ -146,18 +148,17 @@
                   (s/named (s/recursive myself) (:name t))))
      :cljs (err/int-error (str "TODO CLJS Name")))
     (:Any) s/Any
-    (:U) (apply s/either (mapv #(ast->schema % name-env) (:types t))) ;; TODO Could we generate a nice name from the type? Prismatic schema's Either isn't so informative
+    (:U) (apply s/cond-pre (mapv #(ast->schema % name-env) (:types t))) ;; TODO Could we generate a nice name from the type? Prismatic schema's Either isn't so informative
     (:I) (apply s/both (mapv #(ast->schema % name-env) (:types t)))
     (:HVec) (if (:drest t)
               (throw (ex-info  "Cannot generate predicate for dotted HVec" {:type ::ast->schema}))
               (vec (concat (map-indexed (fn [idx ti] (s/one (ast->schema ti name-env) (str "idx " idx))) (:types t))
                            (when (:rest t) [(ast->schema (:rest t) name-env)]))))
-    (:CountRange) (s/both (s/either (s/eq nil)
-                                    (s/pred coll? 'coll?))
-                          (s/pred (if (:upper t)
-                                    #(<= (:lower t) (count %) (:upper t))
-                                    #(<= (:lower t) (count %)))
-                                  (str "#(<= " (:lower t) " (count %) " (when (:upper t) (:upper t)) ")")))
+    (:CountRange) (s/constrained [s/Any]
+                                 (if (:upper t)
+                                   #(<= (:lower t) (count %) (:upper t))
+                                   #(<= (:lower t) (count %)))
+                                 (str "#(<= " (:lower t) " (count %) " (when (:upper t) (:upper t)) ")"))
     (:singleton) (s/eq (:val t))
     (:HMap)
     , (let [mand (apply hash-map (:mandatory t))
@@ -176,8 +177,8 @@
         (if (empty? (:absent-keys t))
           base-scm
           (err/int-error (str "Cannot generate predicate for :absent-keys"))))
-    (:Rec) (throw (ex-info  "Cannot generate predicate for recursive types" {:type ::ast->schema}))
-    (throw (ex-info (str op " not supported in type->pred: " (:form t)) {:type ::ast->schema}))))
+      (:Rec) (throw (ex-info  "Cannot generate predicate for recursive types" {:type ::ast->schema}))
+      (throw (ex-info (str op " not supported in type->pred: " (:form t)) {:type ::ast->schema}))))
 
 (defn wrap-single-arity-fn-with-validation
   "Wraps a single-method fn with arity checking."

@@ -17,6 +17,23 @@
       "tests that schema works for aliases")
   (is (= (list (list nil)) (s/validate (schema TestRecursiveAlias) (list (list nil))))
       "tests that recursive types work")
+  (testing "CountRange"
+    (is (= (s/validate
+            (tts/type-syntax->schema `(t/CountRange 3) (atom {}))
+            [1 2 3 4 5])
+           [1 2 3 4 5]))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (s/validate
+                  (tts/type-syntax->schema `(t/CountRange 3) (atom {}))
+                  [1 2])))
+    (is (= (s/validate
+            (tts/type-syntax->schema `(t/CountRange 3 4) (atom {}))
+            [1 2 3 4])
+           [1 2 3 4]))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (s/validate
+                  (tts/type-syntax->schema `(t/CountRange 3 4) (atom {}))
+                  [1 2 3 4 5]))))
   (is (= '{:test :testing-hmap} (s/validate (schema '{:test t/Keyword}) '{:test :testing-hmap})))
   (is (= '["hey" 12] (s/validate (schema '[String Number]) '["hey" 12]))))
 
