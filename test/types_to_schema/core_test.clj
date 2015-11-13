@@ -34,6 +34,17 @@
                  (s/validate
                   (tts/type-syntax->schema `(t/CountRange 3 4) (atom {}))
                   [1 2 3 4 5]))))
+  (testing "Unions"
+    (is (s/validate
+         (tts/type-syntax->schema `(t/U String Long) (atom {}))
+         3))
+    (is (s/validate
+         (tts/type-syntax->schema `(t/U String Long) (atom {}))
+         "ok"))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (s/validate
+                  (tts/type-syntax->schema `(t/U String Long) (atom {}))
+                  :nope))))
   (is (= '{:test :testing-hmap} (s/validate (schema '{:test t/Keyword}) '{:test :testing-hmap})))
   (is (= '["hey" 12] (s/validate (schema '[String Number]) '["hey" 12]))))
 

@@ -148,7 +148,7 @@
                   (s/named (s/recursive myself) (:name t))))
      :cljs (err/int-error (str "TODO CLJS Name")))
     (:Any) s/Any
-    (:U) (apply s/cond-pre (mapv #(ast->schema % name-env) (:types t))) ;; TODO Could we generate a nice name from the type? Prismatic schema's Either isn't so informative
+    (:U) (apply s/either (mapv #(ast->schema % name-env) (:types t))) ;; TODO Could we generate a nice name from the type? Prismatic schema's Either isn't so informative
     (:I) (apply s/both (mapv #(ast->schema % name-env) (:types t)))
     (:HVec) (if (:drest t)
               (throw (ex-info  "Cannot generate predicate for dotted HVec" {:type ::ast->schema}))
