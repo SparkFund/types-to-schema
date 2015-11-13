@@ -34,6 +34,10 @@
                  (s/validate
                   (tts/type-syntax->schema `(t/CountRange 3 4) (atom {}))
                   [1 2 3 4 5]))))
+  (testing "Seqable via (schema-map)"
+    (is (s/validate
+         (tts/type-syntax->schema `(t/Seqable t/Int) (atom {}))
+         [1 2 3 4 5])))
   (testing "Unions"
     (is (s/validate
          (tts/type-syntax->schema `(t/U String Long) (atom {}))

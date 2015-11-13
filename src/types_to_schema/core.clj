@@ -7,7 +7,9 @@
             [clojure.core.typed.current-impl :as impl]
             [clojure.core.typed.errors :as err]
             [clojure.core.typed.parse-ast :as ast]
-            [schema.core :as s]))
+            [schema.core :as s]
+            [schema.spec.core :as spec]
+            [schema.utils :as utils]))
 
 (def wrappers-created
   "For coverage checking. A set of every wrapper that's been created, by function symbol."
@@ -17,27 +19,33 @@
   (atom #{}))
 
 ;;; This is probably more of general utility?
-#_
-(defrecord SchemaMap [f schema desc]
+(defrecord SchemaMap [func schema desc]
   s/Schema
-  (walker [this]
-    (let [sub-walker (s/subschema-walker schema)]
-      (clojure.core/fn [x]
-        (sub-walker (f x)))))
-  (explain [this] (list 'schema-map desc (s/explain schema))))
-#_
+  (spec [this] this)
+  (explain [this] (list 'schema-map desc (s/explain schema)))
+  spec/CoreSpec
+  (subschemas [this] [schema])
+  (checker [this params]
+    (let [subc (spec/sub-checker {:schema schema} params)]
+      (fn [x]
+        (let [x' (func x)
+              tx (subc x')]
+          (if (utils/error? tx)
+            tx
+            (or tx x')))))))
+
 (defn schema-map
   "fmap for schemas (applies f to values before schema checking)"
-  [f schema desc]
-  (SchemaMap. f schema desc))
+  [func schema desc]
+  (SchemaMap. func schema desc))
 
 (defn rclass-preds [t]
   (case t
     (clojure.lang.Seqable)
     {:args #{1}
      :pred (fn [a?]
-             (throw (ex-info "TODO" {:v a?}))
-             #_(schema-map seq [a?] `seq))}
+             #_(throw (ex-info "TODO" {:v a?}))
+             (schema-map seq [a?] `seq))}
     (clojure.lang.IPersistentCollection
      clojure.lang.ISeq
      clojure.lang.IPersistentStack
