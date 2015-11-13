@@ -192,35 +192,41 @@
   "Wraps a single-method fn with arity checking."
   [f fn-sym {:keys [dom-schemas rest-schema rng-schema]}]
   (swap! wrappers-created conj fn-sym)
-  (fn [& args]
-    (swap! wrappers-called conj fn-sym)
-    (when-not (if (some? rest-schema)
-                (<= (count dom-schemas) (count args))
-                (= (count dom-schemas) (count args)))
-      (throw (ex-info (str "Supplied " (count args) " argument" (when (< 1 (count args)) "s")
-                           " when " fn-sym " expected "
-                           (if (some? rest-schema)
-                             (str "at least " (count dom-schemas))
-                             (count dom-schemas))
-                           " argument" (when (< 1 (count dom-schemas)) "s"))
-                      {:fn-sym fn-sym})))
-    (let [r (apply f (map-indexed
-                      (fn [idx [s arg]]
-                        (try (s/validate s arg)
-                             (catch java.lang.IllegalArgumentException e
-                               (throw (ex-info (str "Bad schema for argument " idx " of " fn-sym)
-                                               {:schema s
-                                                :value arg
-                                                :fn-sym fn-sym
-                                                :which-schema [:argument idx]})))))
-                      (map vector (concat dom-schemas (repeat rest-schema)) args)))]
-      (try (s/validate rng-schema r)
-           (catch java.lang.IllegalArgumentException e
-             (throw (ex-info (str "Bad return schema for" fn-sym)
-                             {:schema rng-schema
-                              :value r
-                              :fn-sym fn-sym
-                              :which-schema :return-schema})))))))
+  (let [dom-validators (map s/validator dom-schemas)
+        rest-validator (some-> rest-schema s/validator)
+        rng-validator (s/validator rng-schema)]
+    (fn [& args]
+      (swap! wrappers-called conj fn-sym)
+      (when-not (if (some? rest-schema)
+                  (<= (count dom-schemas) (count args))
+                  (= (count dom-schemas) (count args)))
+        (throw (ex-info (str "Supplied " (count args) " argument" (when (< 1 (count args)) "s")
+                             " when " fn-sym " expected "
+                             (if (some? rest-schema)
+                               (str "at least " (count dom-schemas))
+                               (count dom-schemas))
+                             " argument" (when (< 1 (count dom-schemas)) "s"))
+                        {:fn-sym fn-sym})))
+      (let [r (apply f (map-indexed
+                        (fn [idx [s validator arg]]
+                          (try (validator arg)
+                               (catch java.lang.IllegalArgumentException e
+                                 (throw (ex-info (str "Bad schema for argument " idx " of " fn-sym)
+                                                 {:schema s
+                                                  :value arg
+                                                  :fn-sym fn-sym
+                                                  :which-schema [:argument idx]})))))
+                        (map vector
+                             (concat dom-schemas (repeat rest-schema))
+                             (concat dom-validators (repeat rest-validator))
+                             args)))]
+        (try (rng-validator r)
+             (catch java.lang.IllegalArgumentException e
+               (throw (ex-info (str "Bad return schema for" fn-sym)
+                               {:schema rng-schema
+                                :value r
+                                :fn-sym fn-sym
+                                :which-schema :return-schema}))))))))
 
 (defn wrap-multi-arity-fn-with-validation
   [f fn-sym method-schemas]
