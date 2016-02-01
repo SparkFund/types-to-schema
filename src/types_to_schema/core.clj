@@ -152,6 +152,8 @@
               (throw (ex-info  "Cannot generate predicate for dotted HVec" {:type ::ast->schema}))
               (vec (concat (map-indexed (fn [idx ti] (s/one (ast->schema ti name-env) (str "idx " idx))) (:types t))
                            (when (:rest t) [(ast->schema (:rest t) name-env)]))))
+    (:HSequential) (s/both (s/pred sequential? 'sequential?)
+                           (ast->schema (assoc t :op :HVec) name-env))
     (:CountRange) (s/both (s/either (s/eq nil)
                                     (s/pred coll? 'coll?))
                           (s/pred (if (:upper t)
