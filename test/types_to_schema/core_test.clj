@@ -20,7 +20,9 @@
   (is (= '{:test :testing-hmap} (s/validate (schema '{:test t/Keyword}) '{:test :testing-hmap})))
   (is (= '["hey" 12] (s/validate (schema '[String Number]) '["hey" 12])))
   (is (= '["hey" 12] (s/validate (schema (t/HSequential [t/Str t/Int]))
-                                 '["hey" 12]))))
+                                 '["hey" 12])))
+  (is (= '("hey" 12) (s/validate (schema (t/HVec [t/Str t/Int]))
+                                 '("hey" 12)))))
 
 (deftest test-wrapped-functions
   (let [counter @function-calls]
