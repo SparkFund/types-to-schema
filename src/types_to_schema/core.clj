@@ -121,6 +121,18 @@
       :else
       (err/int-error (str "Don't know how to apply type: " (:form t))))))
 
+(defn sequential-schema
+  [t name-env]
+  (let [{:keys [types drest rest]} t]
+    (when drest
+      (throw (ex-info  "Cannot generate predicate for dotted sequential form"
+                       {:type ::ast->schema})))
+    (vec (concat (map-indexed (fn [idx ti]
+                                (s/one (ast->schema ti name-env)
+                                       (str "idx " idx)))
+                              types)
+                 (when rest [(ast->schema rest name-env)])))))
+
 (defn ast->schema
   "given type syntax, returns actual prismatic schema as data, not a macro
 
@@ -148,12 +160,14 @@
     (:Any) s/Any
     (:U) (apply s/either (mapv #(ast->schema % name-env) (:types t))) ;; TODO Could we generate a nice name from the type? Prismatic schema's Either isn't so informative
     (:I) (apply s/both (mapv #(ast->schema % name-env) (:types t)))
-    (:HVec) (if (:drest t)
-              (throw (ex-info  "Cannot generate predicate for dotted HVec" {:type ::ast->schema}))
-              (vec (concat (map-indexed (fn [idx ti] (s/one (ast->schema ti name-env) (str "idx " idx))) (:types t))
-                           (when (:rest t) [(ast->schema (:rest t) name-env)]))))
-    (:HSequential) (s/both (s/pred sequential? 'sequential?)
-                           (ast->schema (assoc t :op :HVec) name-env))
+    (:HVec)
+    (s/both (s/pred vector? 'vector?)
+            (sequential-schema t name-env))
+    (:HSequential)
+    (s/both (s/pred sequential? 'sequential?)
+            (sequential-schema t name-env))
+    (:HSeq)
+    (sequential-schema t name-env)
     (:CountRange) (s/both (s/either (s/eq nil)
                                     (s/pred coll? 'coll?))
                           (s/pred (if (:upper t)
