@@ -24,7 +24,9 @@
                                  '["hey" 12])))
   (is (= '["hey" 12] (s/validate (schema (t/HSeq [t/Str t/Int]))
                                  '["hey" 12])))
-  (is (nil? (s/check (schema (t/NonEmptyLazySeq t/Int)) (map inc (range))))))
+  (is (nil? (s/check (schema (t/NonEmptyLazySeq t/Int)) (map inc (range)))))
+  (is (nil? (s/check (schema (t/HMap :absent-keys #{:foo :bar})) {:not "foo"})))
+  (is (not (nil? (s/check (schema (t/HMap :absent-keys #{:foo :bar})) {:foo "foo"})))))
 
 (deftest test-wrapped-functions
   (let [counter @function-calls]

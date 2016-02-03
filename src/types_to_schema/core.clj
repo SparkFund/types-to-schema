@@ -204,7 +204,9 @@
                               [[s/Any s/Any]]))))]
         (if (empty? (:absent-keys t))
           base-scm
-          (err/int-error (str "Cannot generate predicate for :absent-keys"))))
+          (let [absent-keys (set (map :val (:absent-keys t)))
+                pred (fn [m] (not (some absent-keys (keys m))))]
+            (s/both base-scm (s/pred pred "absent-keys")))))
     (:Rec) (throw (ex-info  "Cannot generate predicate for recursive types" {:type ::ast->schema}))
     (throw (ex-info (str op " not supported in type->pred: " (:form t)) {:type ::ast->schema}))))
 
