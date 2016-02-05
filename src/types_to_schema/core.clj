@@ -82,6 +82,18 @@
 
 (declare ast->schema)
 
+(defn sequential-schema
+  [t name-env]
+  (let [{:keys [types drest rest]} t]
+    (when drest
+      (throw (ex-info  "Cannot generate predicate for dotted sequential form"
+                       {:type ::ast->schema})))
+    (vec (concat (map-indexed (fn [idx ti]
+                                (s/one (ast->schema ti name-env)
+                                       (str "idx " idx)))
+                              types)
+                 (when rest [(ast->schema rest name-env)])))))
+
 (defmulti tapp-schema
   "Given a :TApp type, if the operator name matches the symbol, return a custom schema"
   (fn [t _] (-> t :rator :name)))
@@ -90,6 +102,19 @@
   [t name-env]
   (assert (= 1 (count (:rands t))) "only single argument to t/Option allowed")
   (s/maybe (ast->schema (first (:rands t)) name-env)))
+
+;; This samples the first element of a lazy seq and checks it against the
+;; given seq type
+(defmethod tapp-schema `t/NonEmptyLazySeq
+  [t name-env]
+  (assert (= 1 (count (:rands t))))
+  (let [schema [(s/one (ast->schema (first (:rands t)) name-env) "idx0")]
+        pred (fn [x]
+               (let [lazy? (instance? clojure.lang.LazySeq x)
+                     sentinel (when lazy? (take 1 x))]
+                 (when (seq sentinel)
+                   (nil? (s/check schema sentinel)))))]
+    (s/pred pred "non-empty lazy seq")))
 
 (defmethod tapp-schema :default
   [t name-env]
@@ -148,10 +173,14 @@
     (:Any) s/Any
     (:U) (apply s/either (mapv #(ast->schema % name-env) (:types t))) ;; TODO Could we generate a nice name from the type? Prismatic schema's Either isn't so informative
     (:I) (apply s/both (mapv #(ast->schema % name-env) (:types t)))
-    (:HVec) (if (:drest t)
-              (throw (ex-info  "Cannot generate predicate for dotted HVec" {:type ::ast->schema}))
-              (vec (concat (map-indexed (fn [idx ti] (s/one (ast->schema ti name-env) (str "idx " idx))) (:types t))
-                           (when (:rest t) [(ast->schema (:rest t) name-env)]))))
+    (:HVec)
+    (s/both (s/pred vector? 'vector?)
+            (sequential-schema t name-env))
+    (:HSequential)
+    (s/both (s/pred sequential? 'sequential?)
+            (sequential-schema t name-env))
+    (:HSeq)
+    (sequential-schema t name-env)
     (:CountRange) (s/both (s/either (s/eq nil)
                                     (s/pred coll? 'coll?))
                           (s/pred (if (:upper t)
@@ -175,7 +204,9 @@
                               [[s/Any s/Any]]))))]
         (if (empty? (:absent-keys t))
           base-scm
-          (err/int-error (str "Cannot generate predicate for :absent-keys"))))
+          (let [absent-keys (set (map :val (:absent-keys t)))
+                pred (fn [m] (not (some absent-keys (keys m))))]
+            (s/both base-scm (s/pred pred "absent-keys")))))
     (:Rec) (throw (ex-info  "Cannot generate predicate for recursive types" {:type ::ast->schema}))
     (throw (ex-info (str op " not supported in type->pred: " (:form t)) {:type ::ast->schema}))))
 

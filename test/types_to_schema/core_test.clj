@@ -18,7 +18,15 @@
   (is (= (list (list nil)) (s/validate (schema TestRecursiveAlias) (list (list nil))))
       "tests that recursive types work")
   (is (= '{:test :testing-hmap} (s/validate (schema '{:test t/Keyword}) '{:test :testing-hmap})))
-  (is (= '["hey" 12] (s/validate (schema '[String Number]) '["hey" 12]))))
+  (is (= '["hey" 12] (s/validate (schema '[String Number]) '["hey" 12])))
+  (is (thrown? Exception (s/validate (schema '[String Number]) '("hey" 12))))
+  (is (= '["hey" 12] (s/validate (schema (t/HSequential [t/Str t/Int]))
+                                 '["hey" 12])))
+  (is (= '["hey" 12] (s/validate (schema (t/HSeq [t/Str t/Int]))
+                                 '["hey" 12])))
+  (is (nil? (s/check (schema (t/NonEmptyLazySeq t/Int)) (map inc (range)))))
+  (is (nil? (s/check (schema (t/HMap :absent-keys #{:foo :bar})) {:not "foo"})))
+  (is (not (nil? (s/check (schema (t/HMap :absent-keys #{:foo :bar})) {:foo "foo"})))))
 
 (deftest test-wrapped-functions
   (let [counter @function-calls]
